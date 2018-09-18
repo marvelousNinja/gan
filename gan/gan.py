@@ -45,21 +45,19 @@ class Discriminator(torch.nn.Module):
     def forward(self, x):
         return self.layers(x).view(-1, 1)
 
-def transform(img):
-
-    pass
-
 def fit():
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
     dataset = torchvision.datasets.MNIST(root='./', download=True, transform=torchvision.transforms.Compose([
         torchvision.transforms.ToTensor(),
-        torchvision.transforms.Normalize((0.1204, ), (0.2986, ))
+        torchvision.transforms.Normalize((0.1307,), (0.3081,))
     ]))
 
     num_epochs = 100
     batch_size = 8
-    gen = Generator()
+    gen = Generator().to(device)
     gen_opt = torch.optim.Adam(gen.parameters(), lr=0.0002)
-    disc = Discriminator()
+    disc = Discriminator().to(device)
     disc_opt = torch.optim.Adam(disc.parameters(), lr=0.0002)
     loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
@@ -67,17 +65,17 @@ def fit():
         for data, labels in tqdm(loader):
             # 1.1. Training discriminator on on real images
             labels[:] = 1
-            labels = labels.float()
+            labels = labels.float().to(device)
             disc_opt.zero_grad()
-            logits = disc(data)
+            logits = disc(data.to(device))
             disc_loss = torch.nn.functional.binary_cross_entropy_with_logits(logits, labels[:, None])
             disc_loss.backward()
             disc_opt.step()
 
             # 1.2. Training discriminator on fake images
             noise = torch.randn(batch_size, 100, 1, 1)
-            fake_data = gen(noise).detach()
-            fake_labels = torch.zeros(batch_size)
+            fake_data = gen(noise.to(device)).detach()
+            fake_labels = torch.zeros(batch_size).to(device)
             disc_opt.zero_grad()
             logits = disc(fake_data)
             disc_loss = torch.nn.functional.binary_cross_entropy_with_logits(logits, fake_labels[:, None])
@@ -87,8 +85,8 @@ def fit():
             # 2. Training the generator
             gen_opt.zero_grad()
             noise = torch.randn(batch_size * 2, 100, 1, 1)
-            fake_data = gen(noise)
-            fake_labels = torch.ones(batch_size * 2)
+            fake_data = gen(noise.to(device))
+            fake_labels = torch.ones(batch_size * 2).to(device)
             logits = disc(fake_data)
             gen_loss = torch.nn.functional.binary_cross_entropy_with_logits(logits, fake_labels[:, None])
             gen_loss.backward()
